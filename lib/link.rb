@@ -5,9 +5,12 @@ class Link
 		# this makes instances of this class Datamapper resources
 		include DataMapper::Resource
 
+		# has n, :tags, :through => Resource
+		
 		# this block describes what resources our model will have
 		# serial means that it will be auto-incremented for every record
 		property :id, Serial 
 		property :title, String
 		property :url, String 
+		property :tags, String
 end

@@ -22,6 +22,7 @@ end
 post '/links' do
 	url = params["url"]
 	title = params["title"]
-    Link.create(:url => url, :title => title)
+	tags = params["tags"]
+    Link.create(:url => url, :title => title, :tags => tags)
     redirect to('/')
 end
