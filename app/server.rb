@@ -1,5 +1,6 @@
 require 'sinatra'
 require 'data_mapper'
+require 'rack-flash'
 
 env = ENV["RACK_ENV"] || "development"
 # we're telling datamapper to use a postgres database on localhost.
@@ -9,7 +10,9 @@ DataMapper.setup(:default, "postgres://localhost/bookmark_manager_#{env}")
 
 require './lib/link'
 require './lib/tag'
-require './lib/user' # this needs to be done after datamapper is initialised
+require './lib/user'
+require './app/helpers/application'
+use Rack::Flash # this needs to be done after datamapper is initialised
 
 # after declaring your models, you should finalise them
 DataMapper.finalize
@@ -21,37 +24,40 @@ enable :sessions
 set :session_secret, 'super secret'
 
 get '/' do
-	@links = Link.all
-	erb :index
+    @links = Link.all
+    erb :index
 end
 
 post '/links' do
-	url = params["url"]
-	title = params["title"]
-	tags = params["tags"].split(" ").map{|tag| Tag.first_or_create(:text => tag)}
-    Link.create(:url => url, :title => title, :tags => tags)
+    url = params["url"]
+    title = params["title"]
+    tags = params["tags"].split(" ").map{|tag| Tag.first_or_create(text: tag)}
+    Link.create(url: url, title: title, tags: tags)
     redirect to('/')
 end
 
 get '/tags/:text' do
-	tag = Tag.first(:text => params[:text])
-	@links = tag ? tag.links : []
-	erb :index
+    tag = Tag.first(text: params[:text])
+    @links = tag ? tag.links : []
+    erb :index
 end
 
 get '/users/new' do
+    @user = User.new
     erb :"users/new"
 end
 
 post '/users' do
-    user = User.create(:email => params[:email],
-                :password => params[:password])
-    session[:user_id] = user.id
-    redirect to ('/')
-end
+    @user = User.create(email: params[:email],
+                password: params[:password],
+                password_confirmation: params[:password_confirmation])
+    if @user.save
+      session[:user_id] = @user.id
+      redirect to ('/')
 
-helpers do 
-    def current_user
-        @current_user ||=User.get(session[:user_id]) if session[:user_id]
+    else
+      flash.now[:errors] = @user.errors.full_messages
+      erb :"users/new"
     end
 end
+
