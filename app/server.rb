@@ -1,84 +1,30 @@
 require 'sinatra'
 require 'data_mapper'
 require 'rack-flash'
+require 'sinatra/partial'
 
-env = ENV["RACK_ENV"] || "development"
-# we're telling datamapper to use a postgres database on localhost.
-# the name will be bookmark_manager_test or bookmark_manager_development depending on the environment 
+require_relative 'models/link'
+require_relative 'models/user'
+require_relative 'models/tags'
 
-DataMapper.setup(:default, "postgres://localhost/bookmark_manager_#{env}")
+require_relative 'helpers/application'
+require_relative 'data_mapper_setup'
 
-require './lib/link'
-require './lib/tag'
-require './lib/user'
-require './app/helpers/application'
-use Rack::Flash # this needs to be done after datamapper is initialised
+require_relative 'controllers/application'
+require_relative 'controllers/links'
+require_relative 'controllers/session'
+require_relative 'controllers/tags'
+require_relative 'controllers/user'
 
-# after declaring your models, you should finalise them
-DataMapper.finalize
-
-# however, the database tables don't exist yet. Let's tell datamapper to create them
-DataMapper.auto_upgrade!
+use Rack::Flash 
 
 enable :sessions
 set :session_secret, 'super secret'
+set :partial_template_engine, :erb
 
-get '/' do
-    @links = Link.all
-    erb :index
-end
 
-post '/links' do
-    url = params["url"]
-    title = params["title"]
-    tags = params["tags"].split(" ").map{|tag| Tag.first_or_create(text: tag)}
-    Link.create(url: url, title: title, tags: tags)
-    redirect to('/')
-end
 
-get '/tags/:text' do
-    tag = Tag.first(text: params[:text])
-    @links = tag ? tag.links : []
-    erb :index
-end
 
-get '/users/new' do
-    @user = User.new
-    erb :"users/new"
-end
 
-post '/users' do
-    @user = User.create(email: params[:email],
-                password: params[:password],
-                password_confirmation: params[:password_confirmation])
-    if @user.save
-      session[:user_id] = @user.id
-      redirect to ('/')
 
-    else
-      flash.now[:errors] = @user.errors.full_messages
-      erb :"users/new"
-    end
-end    
 
-get '/sessions/new' do 
-    erb :"sessions/new"
-end
-
-post '/sessions' do
-    email, password = params[:email], params[:password]
-    user = User.authenticate(email,password)
-    if user
-        session[:user_id] = user.id
-        redirect to '/'
-    else
-        flash[:errors] = ["The email or password is incorrect"]
-        erb :"sessions/new"
-    end
-end
-
-delete '/sessions' do
-    flash[:notice] = "Good bye!"
-    session[:user_id] = nil
-    redirect to('/')
-end
